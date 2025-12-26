@@ -1,3 +1,5 @@
+/// Problem when more, then 1  data ((
+/// Though this is interesting version... it is pretty unpractical in terms of updates...
 const make_fixture = {
   with_labels: <L extends string[]>() => {
     const with_data_source_type = <D extends Record<string, unknown>>() => {
@@ -75,14 +77,28 @@ const make_fixture = {
 
 if (import.meta.main) {
   const users = make_fixture
-    .with_labels<["me"]>()
-    .with_data_source_type<{}>()
+    .with_labels<["me", "all", "boys", "girls"]>()
+    .with_data_source_type<{
+      id: string;
+      name: string;
+      age: number;
+      sex: "male" | "female";
+    }>()
     .with_state_derivations({
-      init: (name: string) => (d) => ({ ...d, name }),
+      create: (id: string) => (d) => ({ ...d, id }),
     })
-    .build([{}, ["me"]]);
+    .build(
+      [{
+        name: "nik",
+        sex: "male",
+      }, ["me", "all", "boys"]],
+      [{ name: "olivia", sex: "female" }, [
+        "all",
+        "girls",
+      ]],
+    );
 
-  const nik = users.compute.init("nik").me;
+  const nik = users.compute.create("nik").me;
 
   console.log(nik(), nik(), nik());
 }
