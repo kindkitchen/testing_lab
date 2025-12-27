@@ -6,7 +6,9 @@ export const make_fixture = <
       string,
       (
         param: Partial<RestAfterFifth<T>[number][0]>,
-        ...rest: unknown[]
+        ...rest:
+          // deno-lint-ignore no-explicit-any
+          any[] /// hmm... <unknown[]> is not working (it will not allow anything during invocation)
       ) => boolean
     >,
     state_computer_tip:
