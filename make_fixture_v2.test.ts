@@ -22,7 +22,10 @@ Deno.test("make_fixture (v2) should work", async (t) => {
 
     console.log(fixture);
     await tt.step("Should be invoked without errors", () => {
-      console.log(fixture.one_unique.by_id("TODO")?.as_state.compact());
+      const hero = fixture.one_unique.by_id("TODO");
+      console.log(hero?.as_state.compact());
+      hero?.update_data_source((h) => ({ ...h, name: "hero" }));
+      console.log(hero?.as_state.compact());
     });
   });
 });
