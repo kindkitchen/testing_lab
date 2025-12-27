@@ -3,5 +3,6 @@
   "exactOptionalPropertyTypes": true,
   "imports": {
     "effect": "npm:effect@^3.19.13"
-  }
+  },
+  "version": "0.1.0"
 }
