@@ -1,3 +1,32 @@
+type FirstSecondThirdRest<T> = T extends
+  [infer First, infer Second, infer Third, ...infer Rest] ? {
+    First: First;
+    Second: Second;
+    Third: Third;
+    Rest: Rest;
+  }
+  : never;
+
+export const make_fixture = <
+  T extends FirstSecondThirdRest<[
+    DATA: Record<string, unknown>,
+    UNIQUE_GETTER:
+      | Record<
+        string,
+        (
+          predicate: (param: Partial<T[number]["First"]>) => boolean,
+        ) => Partial<T[number]["First"]>
+      >
+      | null,
+    STATE_COMPUTER: Record<
+      string,
+      (data: Partial<T[number]["First"]>) => Partial<T[number]["First"]>
+    >,
+    ...LABELS: string[],
+  ]>[],
+>(...variants: T) => {
+};
+
 /**
  * What I want to create?
  * 1. Dictionary
