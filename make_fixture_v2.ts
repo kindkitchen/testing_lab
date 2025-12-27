@@ -109,6 +109,9 @@ export const make_fixture = <
               actual: Partial<RestAfterFifth<T>[number][0]>,
             ) => Partial<RestAfterFifth<T>[number][0]>,
           ) => void;
+          as_state: {
+            [k in keyof T[3]]: () => ReturnType<T[3][k]>;
+          };
         };
       },
     ), /// TODO
