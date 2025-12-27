@@ -1,204 +1,199 @@
-export const make_fixture = <
-  T extends [
-    unique_getter_tip:
-      "The dictionary, which represent api to get unique fixture by some predicate:",
-    UNIQUE_GETTER: Record<
-      string,
-      (
-        param: Partial<RestAfterFifth<T>[number][0]>,
-        ...rest:
-          // deno-lint-ignore no-explicit-any
-          any[] /// hmm... <unknown[]> is not working (it will not allow anything during invocation)
-      ) => boolean
-    >,
-    state_computer_tip:
-      "The dictionary, which represent api, to compute specific representation of the data:",
-    STATE_COMPUTER: Record<
-      string,
-      (
-        data: Partial<RestAfterFifth<T>[number][0]>,
-      ) => // deno-lint-ignore no-explicit-any
-      any /// hmm... <unknown> is not working for some reason...
-    >,
-    variants_tip:
-      "Any amount of variants - ...[initial data, ...all labels with which it should be associated][]:",
-    ...VARIANTS: [
-      data: Record<string, unknown>,
-      ...labels: string[],
-    ][],
-  ],
->(
-  ...[_tip1, unique_getter, _tip2, state_computer, _tip3, ...variants]: T
-) => {
-  const entries_from_state_computer = Object.entries(state_computer) as {
-    [k in keyof T[3]]: [k, T[3][k]];
-  }[keyof T[3]][];
-  const all_pointers_to_data_source = variants.reduce((acc, [_data]) => {
-    acc.push({ _data });
-
-    return acc;
-  }, [] as { _data: RestAfterFifth<T>[number][0] }[]);
-  const pointers_grouped_by_label = variants
-    .flatMap(([data, ...labels]) =>
-      labels.map((label) =>
-        [data, label] as [
-          RestAfterFifth<T>[number][0],
-          RestAfterFifth<T>[number][1][number],
-        ]
-      )
-    )
-    .reduce(
-      (acc, [data, label]) => {
-        if (!acc[label]) {
-          acc[label] = [];
-        }
-
-        acc[label].push(
-          all_pointers_to_data_source.find(({ _data }) => _data === data)!, /// The <!> is allowed here:
-          /// It 100% should be find!
-          /// Why?
-          /// Because we iterate same data objects (so triple equals should work).
-          /// Because this is sync code (so anyone except us has time to modify refs to data objects)
-          /// Because till this moment we are not touch refs.
-          /// BTW after this step - we will free to do this, because now
-          /// we trust our explicit pointers ({ _data: ... })
-        );
-
-        return acc;
-      },
-      {} as Record<
-        RestAfterFifth<T>[number][1][number],
-        { _data: RestAfterFifth<T>[number][0] }[]
+export const make_fixture =
+  <D extends Record<string, unknown>, L extends string[]>() =>
+  <
+    T extends [
+      unique_getter_tip:
+        "The dictionary, which represent api to get unique fixture by some predicate:",
+      UNIQUE_GETTER: Record<
+        string,
+        (
+          param: Partial<D>,
+          ...rest:
+            // deno-lint-ignore no-explicit-any
+            any[] /// hmm... <unknown[]> is not working (it will not allow anything during invocation)
+        ) => boolean
       >,
-    );
-  const entries_from_pointers_grouped_by_label = Object.entries(
-    pointers_grouped_by_label,
-  ) as [
-    RestAfterFifth<T>[number][1][number],
-    { _data: RestAfterFifth<T>[number][0] }[],
-  ][];
-  const output = {
-    one_unique: (Object.entries(unique_getter) as {
-      [k in keyof T[1]]: [k, T[1][k]];
-    }[keyof T[1]][]).reduce(
-      (acc, [name, fn]) => {
-        acc[name] = (...params) => {
-          const pointer = all_pointers_to_data_source.find((d) =>
-            fn(d._data, ...params)
-          );
+      state_computer_tip:
+        "The dictionary, which represent api, to compute specific representation of the data:",
+      STATE_COMPUTER: Record<
+        string,
+        (
+          data: Partial<D>,
+        ) => // deno-lint-ignore no-explicit-any
+        any /// hmm... <unknown> is not working for some reason...
+      >,
+      variants_tip:
+        "Any amount of variants - ...[initial data, ...all labels with which it should be associated][]:",
+      ...VARIANTS: [
+        data: Partial<D>,
+        ...labels: L[number][],
+      ][],
+    ],
+  >(
+    ...[_tip1, unique_getter, _tip2, state_computer, _tip3, ...variants]: T
+  ) => {
+    const entries_from_state_computer = Object.entries(state_computer) as {
+      [k in keyof T[3]]: [k, T[3][k]];
+    }[keyof T[3]][];
+    const all_pointers_to_data_source = variants.reduce((acc, [_data]) => {
+      acc.push({ _data });
 
-          if (!pointer) {
-            return null;
+      return acc;
+    }, [] as { _data: Partial<D> }[]);
+    const pointers_grouped_by_label = variants
+      .flatMap(([data, ...labels]) =>
+        labels.map((label) =>
+          [data, label] as [
+            D,
+            RestAfterFifth<T>[number][1][number],
+          ]
+        )
+      )
+      .reduce(
+        (acc, [data, label]) => {
+          if (!acc[label]) {
+            acc[label] = [];
           }
 
-          return {
-            update_data_source: (logic) => {
-              pointer._data = logic(pointer._data);
-            },
-            as_state: entries_from_state_computer.reduce(
-              (acc, [name, fn]) => {
-                acc[name] = () =>
-                  fn(pointer._data) as ReturnType<T[3][typeof name]>;
-
-                return acc;
-              },
-              {} as {
-                [k in keyof T[3]]: () => ReturnType<T[3][k]>;
-              },
-            ),
-          };
-        };
-        return acc;
-      },
-      {} as {
-        [k in keyof T[1]]: (
-          ...params: RestAfterFirst<Parameters<T[1][k]>>
-        ) => null | {
-          update_data_source: (
-            update_logic: (
-              actual: Partial<RestAfterFifth<T>[number][0]>,
-            ) => Partial<RestAfterFifth<T>[number][0]>,
-          ) => void;
-          as_state: {
-            [k in keyof T[3]]: () => ReturnType<T[3][k]>;
-          };
-          /// TODO: will be cool to add possibility to add/remove to/from label group for this data-set
-        };
-      },
-    ),
-    compute_state: entries_from_state_computer.reduce(
-      (acc, [name, fn]) => {
-        if (!acc[name]) {
-          acc[name] = entries_from_pointers_grouped_by_label.reduce(
-            (acc2, [label, pointers]) => {
-              acc2[label] = () => {
-                const x = pointers.map(({ _data }) => fn(_data));
-
-                return x;
-              };
-              return acc2;
-            },
-            {} as Record<
-              RestAfterFifth<T>[number][1][number],
-              () => ReturnType<T[3][keyof T[3]]>[]
-            >,
+          acc[label].push(
+            all_pointers_to_data_source.find(({ _data }) => _data === data)!, /// The <!> is allowed here:
+            /// It 100% should be find!
+            /// Why?
+            /// Because we iterate same data objects (so triple equals should work).
+            /// Because this is sync code (so anyone except us has time to modify refs to data objects)
+            /// Because till this moment we are not touch refs.
+            /// BTW after this step - we will free to do this, because now
+            /// we trust our explicit pointers ({ _data: ... })
           );
-        }
-        return acc;
-      },
-      {} as {
-        [k in keyof T[3]]: Record<
+
+          return acc;
+        },
+        {} as Record<
           RestAfterFifth<T>[number][1][number],
-          () => ReturnType<T[3][k]>[]
-        >;
-      },
-    ),
-    with_label: variants.reduce(
-      (
-        acc,
-        [_data, ...labels]: RestAfterFifth<T>[number],
-      ) => {
-        labels.forEach(
-          (l: RestAfterFirst<RestAfterFifth<T>[number]>[number]) => {
-            acc[l] = entries_from_state_computer.reduce((acc2, [name, fn]) => {
-              acc2.as_state[name] = () =>
-                pointers_grouped_by_label[l].map(
-                  ({ _data }) => fn(_data),
-                );
-              return acc2;
-            }, { as_state: {} } as {
-              as_state: {
-                [k in keyof T[3]]: () => ReturnType<T[3][k]>[];
-              };
-            });
-          },
-        );
+          { _data: Partial<D> }[]
+        >,
+      );
+    const entries_from_pointers_grouped_by_label = Object.entries(
+      pointers_grouped_by_label,
+    ) as [
+      RestAfterFifth<T>[number][1][number],
+      { _data: Partial<D> }[],
+    ][];
+    const output = {
+      one_unique: (Object.entries(unique_getter) as {
+        [k in keyof T[1]]: [k, T[1][k]];
+      }[keyof T[1]][]).reduce(
+        (acc, [name, fn]) => {
+          acc[name] = (...params) => {
+            const pointer = all_pointers_to_data_source.find((d) =>
+              fn(d._data, ...params)
+            );
 
-        return acc;
-      },
-      {} as Record<
-        RestAfterFirst<RestAfterFifth<T>[number]>[number],
-        {
-          as_state: {
-            [k in keyof T[3]]: () => ReturnType<T[3][k]>[];
+            if (!pointer) {
+              return null;
+            }
+
+            return {
+              update_data_source: (logic) => {
+                pointer._data = logic(pointer._data);
+              },
+              as_state: entries_from_state_computer.reduce(
+                (acc, [name, fn]) => {
+                  acc[name] = () =>
+                    fn(pointer._data) as ReturnType<T[3][typeof name]>;
+
+                  return acc;
+                },
+                {} as {
+                  [k in keyof T[3]]: () => ReturnType<T[3][k]>;
+                },
+              ),
+            };
           };
-        }
-      >,
-    ),
+          return acc;
+        },
+        {} as {
+          [k in keyof T[1]]: (
+            ...params: RestAfterFirst<Parameters<T[1][k]>>
+          ) => null | {
+            update_data_source: (
+              update_logic: (
+                actual: Partial<D>,
+              ) => Partial<D>,
+            ) => void;
+            as_state: {
+              [k in keyof T[3]]: () => ReturnType<T[3][k]>;
+            };
+            /// TODO: will be cool to add possibility to add/remove to/from label group for this data-set
+          };
+        },
+      ),
+      compute_state: entries_from_state_computer.reduce(
+        (acc, [name, fn]) => {
+          if (!acc[name]) {
+            acc[name] = entries_from_pointers_grouped_by_label.reduce(
+              (acc2, [label, pointers]) => {
+                acc2[label] = () => {
+                  const x = pointers.map(({ _data }) => fn(_data));
+
+                  return x;
+                };
+                return acc2;
+              },
+              {} as Record<
+                RestAfterFifth<T>[number][1][number],
+                () => ReturnType<T[3][keyof T[3]]>[]
+              >,
+            );
+          }
+          return acc;
+        },
+        {} as {
+          [k in keyof T[3]]: Record<
+            RestAfterFifth<T>[number][1][number],
+            () => ReturnType<T[3][k]>[]
+          >;
+        },
+      ),
+      with_label: variants.reduce(
+        (
+          acc,
+          [_data, ...labels]: RestAfterFifth<T>[number],
+        ) => {
+          labels.forEach(
+            (l: RestAfterFirst<RestAfterFifth<T>[number]>[number]) => {
+              acc[l] = entries_from_state_computer.reduce(
+                (acc2, [name, fn]) => {
+                  acc2.as_state[name] = () =>
+                    pointers_grouped_by_label[l].map(
+                      ({ _data }) => fn(_data),
+                    );
+                  return acc2;
+                },
+                { as_state: {} } as {
+                  as_state: {
+                    [k in keyof T[3]]: () => ReturnType<T[3][k]>[];
+                  };
+                },
+              );
+            },
+          );
+
+          return acc;
+        },
+        {} as Record<
+          RestAfterFirst<RestAfterFifth<T>[number]>[number],
+          {
+            as_state: {
+              [k in keyof T[3]]: () => ReturnType<T[3][k]>[];
+            };
+          }
+        >,
+      ),
+    };
+
+    return output;
   };
-
-  return output;
-};
-
-make_fixture(
-  "The dictionary, which represent api to get unique fixture by some predicate:",
-  {},
-  "The dictionary, which represent api, to compute specific representation of the data:",
-  {},
-  "Any amount of variants - ...[initial data, ...all labels with which it should be associated][]:",
-  [{}, "", "", ""],
-  [{}, "", "", ""],
-);
 
 /**
  * What I want to create?
