@@ -32,6 +32,30 @@ export const make_fixture = <
 
     return acc;
   }, [] as { data: RestAfterFifth<T>[number][0] }[]);
+  const all_label_groups = variants
+    .flatMap(([data, ...labels]) =>
+      labels.map((label) =>
+        [data, label] as [
+          RestAfterFifth<T>[number][0],
+          RestAfterFifth<T>[number][1][number],
+        ]
+      )
+    )
+    .reduce(
+      (acc, [data, label]) => {
+        if (!acc[label]) {
+          acc[label] = [];
+        }
+
+        acc[label].push(data);
+
+        return acc;
+      },
+      {} as Record<
+        RestAfterFifth<T>[number][1][number],
+        RestAfterFifth<T>[number][0][]
+      >,
+    );
   const output = {
     one_unique: (Object.entries(unique_getter) as {
       [k in keyof T[1]]: [k, T[1][k]];
