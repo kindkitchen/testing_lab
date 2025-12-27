@@ -2,14 +2,12 @@ export const make_fixture = <
   T extends [
     unique_getter_tip:
       "The dictionary, which represent api to get unique fixture by some predicate:",
-    UNIQUE_GETTER:
-      | Record<
-        string,
-        (
-          predicate: (param: Partial<RestAfterFifth<T>[number][0]>) => boolean,
-        ) => Partial<RestAfterFifth<T>[number][0]>
-      >
-      | null,
+    UNIQUE_GETTER: Record<
+      string,
+      (
+        predicate: (param: Partial<RestAfterFifth<T>[number][0]>) => boolean,
+      ) => Partial<RestAfterFifth<T>[number][0]> | null
+    >,
     state_computer_tip:
       "The dictionary, which represent api, to compute specific representation of the data:",
     STATE_COMPUTER: Record<
@@ -25,7 +23,16 @@ export const make_fixture = <
       ...labels: string[],
     ][],
   ],
->(...[_tip1, unique_getter, _tip2, state_computer, _tip3, ...variants]: T) => {
+>(
+  ...[_tip1, unique_getter, _tip2, state_computer, _tip3, ...variants]: T
+) => {
+  const output = {
+    one_unique: {}, /// TODO
+    compute_state: {}, /// TODO
+    with_label: {}, /// TODO
+  };
+
+  return output;
 };
 
 make_fixture(
