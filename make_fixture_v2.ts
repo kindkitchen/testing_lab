@@ -19,7 +19,7 @@ export const make_fixture = <
       ) => Partial<RestAfterFifth<T>[number][0]>
     >,
     variants_tip:
-      "Any amount of variants - [initial data, ...all labels with which it should be associated]:",
+      "Any amount of variants - ...[initial data, ...all labels with which it should be associated][]:",
     ...VARIANTS: [
       data: Record<string, unknown>,
       ...labels: string[],
@@ -33,7 +33,7 @@ make_fixture(
   {},
   "The dictionary, which represent api, to compute specific representation of the data:",
   {},
-  "Any amount of variants - [initial data, ...all labels with which it should be associated]:",
+  "Any amount of variants - ...[initial data, ...all labels with which it should be associated][]:",
   [{}, "", "", ""],
   [{}, "", "", ""],
 );
@@ -42,15 +42,15 @@ make_fixture(
  * What I want to create?
  * 1. Dictionary
  *    - fixture - the whole bunch of terms, associated with same entity/model etc. All below is what each fixture should have
- *    - data - the object, from which values will be used for any state for. 1 data for 1 fixture
- *    - state - specific form/shape of the fixture. It should be deterministically generated from data and many states for 1 fixture
- *    - label - tag/marker, with which particular fixture can be associated and so be fetched by any of them. Fixture label elation is like many-to-many
+ *    - data - the object, from which values will be used for any state for. Many data can be provided for 1 fixture, but probably they should have similar type
+ *    - state - specific form/shape of the fixture. It should be deterministically generated from each data and be many for data (but same for them inside same fixture)
+ *    - label - tag/marker, with which particular data-set of fixture can be associated and so be fetched by any of them. Data label relation is like many-to-many
  * 2. Data - it is shape-agnostic source of truth for any/all states into which it can be transformed/produces etc.
- *    - 1 fixture has 1 data and can generate many states from it
- *    - ability to explicitly modify this data for each fixture independently
- *    - ability to modify data for all by label
- * 3. State - derivation from data. So it is particular representation of the data. 1 fixture 1 data ++states
- *    - should be always computed, so if data is changed, the representation should be automatically recalculated on each retrieve
+ *    - 1 fixture can have many data(s) and can generate many states for each
+ *    - ability to explicitly modify concrete data independently
+ *    - ability to modify all data by some label
+ * 3. State - derivation from data. So it is particular representation of the data. 1 fixture can have many data(s) and each many states
+ *    - should be always computed, so if it's data is changed, the representation should be automatically recalculated on each retrieve (next, this is not related to reactivity)
  */
 
 type RestAfterFifth<T> = T extends [
