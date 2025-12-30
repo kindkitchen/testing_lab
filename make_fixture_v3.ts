@@ -1,3 +1,10 @@
+type FirstRest<T> = T extends [infer First, ...infer Rest] ? [First, Rest]
+  : never;
+type _T_help_message_for_data_type =
+  "ERROR: Explicit generic is missing! Should be something like: for_data_type<{...}>()";
+type _T_help_message_with_possible_tags =
+  "ERROR: Explicit generic is missing! Should be something like: with_possible_tags<['example', 'demo', 'tip']>()";
+
 export const make_fixture = {
   /**
    * A lot of properties are syntax sugar with purpose
@@ -60,6 +67,12 @@ export const make_fixture = {
             ? [_T_help_message_with_possible_tags, never]
             : []
         ) => {
+          type TD = Partial<
+            Exclude<T_data, _T_help_message_for_data_type | undefined>
+          >;
+
+          type TT = Exclude<T_tags, _T_help_message_with_possible_tags | "">;
+
           return {
             /**
              * This is object, in which each property is represented
@@ -79,9 +92,19 @@ export const make_fixture = {
             data_can_be_transformed_into_such_views: <
               T_transformer extends Record<
                 string,
-                (d: T_data, ...params: any[]) => unknown
+                (d: TD, ...params: any[]) => any
               >,
             >(transformer: T_transformer) => {
+              type T_as_arr = {
+                [k in keyof T_transformer]: (
+                  ...params: FirstRest<Parameters<T_transformer[k]>>[1]
+                ) => () => ReturnType<T_transformer[k]>[];
+              };
+              type T_as = {
+                [k in keyof T_transformer]: (
+                  ...params: FirstRest<Parameters<T_transformer[k]>>[1]
+                ) => () => ReturnType<T_transformer[k]>;
+              };
               return {
                 /**
                  * Complete building fixture-set by providing
@@ -92,33 +115,136 @@ export const make_fixture = {
                 build: <
                   T_fixture_set extends Record<
                     string,
-                    { fixture: Partial<T_data>; tags: T_tags[] }
+                    { fixture: TD; tags: TT[] }
                   >,
                 >(fixture_set: T_fixture_set): {
-                  one_by_name: Record<keyof T_fixture_set, {
-                    as: {
-                      [k in keyof T_transformer]: (
-                        ...params: FirstRest<Parameters<T_transformer[k]>>[1]
-                      ) => () => ReturnType<T_transformer[k]>;
-                    };
-                    add_to_more_tags: (...tag: T_tags[]) => void;
-                    remove_from_tags: (...tag: T_tags[]) => void;
+                  /**
+                   * Api to manage one unique fixture.
+                   */
+                  one_by_name: (name: keyof T_fixture_set) => {
+                    /**
+                     * Generate representation of data, that you declared during build.
+                     * You will get not directly this representation, function: `() => representation`.
+                     * So until logic of the representation is the same it will automatically produce
+                     * it with actual values from data-source.
+                     */
+                    as: T_as;
+                    /**
+                     * Mark this fixture with some tags.
+                     * No matter does it is already marked by them or not, but
+                     * from now it will.
+                     */
+                    add_to_more_tags: (...tag: TT[]) => void;
+                    /**
+                     * Remove from fixture associations with ome tags.
+                     * No matter does it is already marked by them or not, but
+                     * from not it will not.
+                     */
+                    remove_from_tags: (...tag: TT[]) => void;
+                    /**
+                     * The only one correct way to update fixture's data.
+                     */
                     update_data_source: (
-                      update_logic: (d: Partial<T_data>) => Partial<T_data>,
+                      /**
+                       * Your custom logic how to produce new data from previous varian.
+                       * Because it is function - you can do this with any custom logic
+                       * or even skip update because of some condition, though in such case you should
+                       * return input as it is...
+                       * So the rule is simple - data will be updated to whatever your function return.
+                       */
+                      update_logic: (d: TD) => TD,
                     ) => void;
-                  }>;
-                  many_with_tag: Record<T_tags, {
-                    as: {
-                      [k in keyof T_transformer]: (
-                        ...params: FirstRest<Parameters<T_transformer[k]>>[1]
-                      ) => () => ReturnType<T_transformer[k]>[];
-                    };
+                  };
+                  /**
+                   * Api for manage list of fixtures with some tag.
+                   */
+                  many_with_tag: (tag: TT) => {
+                    /**
+                     * Generate array with representations for all fixtures marked by some tag.
+                     * It is also will return not directly array with these views but function,
+                     * that will produce it. This will guarantee, that on each call
+                     * the representations will have actual values from data-source.
+                     */
+                    as: T_as_arr;
+                    /**
+                     * Possibility to update all fixtures associated with
+                     * actual tag. Because this is function, any logic, including
+                     * skip during update can be implement.
+                     * The only rule - return value is one that will become new data-source.
+                     */
                     foreach_update_data_source: (
-                      update_logic: (d: Partial<T_data>) => Partial<T_data>,
+                      /**
+                       * Custom logic of update, that will be applied to all
+                       * fixtures under the current tag.
+                       */
+                      update_logic: (d: TD) => TD,
                     ) => void;
-                  }>;
+                  };
                 } => {
-                  return {} as any;
+                  const db = Object
+                    .entries(fixture_set)
+                    .reduce(
+                      (acc, [name, { fixture, tags }]) => {
+                        acc.name_tag_fixture.set(
+                          name,
+                          new Map(tags.map((t) => [t, fixture])),
+                        );
+                        acc.name_fixture.set(name, fixture);
+                        for (const tag of tags) {
+                          (acc.tag_name_fixture.get(tag) ||
+                            acc.tag_name_fixture.set(tag, new Map()).get(tag)!)
+                            .set(name, fixture);
+                        }
+
+                        return acc;
+                      },
+                      {
+                        name_fixture: new Map<string, TD>(),
+                        name_tag_fixture: new Map<string, Map<string, TD>>(),
+                        tag_name_fixture: new Map<string, Map<string, TD>>(),
+                      },
+                    );
+
+                  return {
+                    one_by_name: (name) => ({
+                      add_to_more_tags: (...tags) =>
+                        tags.forEach((tag) => {
+                          const fixture = db.name_fixture.get(name)!;
+                          db.name_tag_fixture.get(name)!.set(tag, fixture);
+                          db.tag_name_fixture.get(tag)!.set(name, fixture);
+                        }),
+                      remove_from_tags: (...tags) =>
+                        tags.forEach((tag) => {
+                          db.name_tag_fixture.get(name)!.delete(tag);
+                          db.tag_name_fixture.get(tag)!.delete(name);
+                        }),
+                      update_data_source: (logic) =>
+                        db.name_fixture.set(
+                          name,
+                          logic(db.name_fixture.get(name)!),
+                        ),
+                      as: Object.entries(transformer).reduce((acc, [k, v]) => {
+                        acc[k as keyof T_transformer] = (...args) =>
+                          v(db.name_fixture.get(name)!, ...args);
+                        return acc;
+                      }, {} as T_as),
+                    }),
+                    many_with_tag: (tag) => ({
+                      as: Object.entries(transformer).reduce((acc, [k, fn]) => {
+                        acc[k as keyof T_transformer] = (...args) => {
+                          const views = db.tag_name_fixture.get(tag)!.values()
+                            .toArray().map((value) => fn(value, ...args));
+                          return views as any;
+                        };
+                        return acc;
+                      }, {} as T_as_arr),
+                      foreach_update_data_source: (logic) =>
+                        db.tag_name_fixture.get(tag)!.entries().toArray()
+                          .forEach(([k, v]) =>
+                            db.tag_name_fixture.get(tag)!.set(k, logic(v))
+                          ),
+                    }),
+                  };
                 },
               };
             },
@@ -144,55 +270,55 @@ type UserFixtureTag =
   | "js"
   | "oboe"
   | "drums";
-const alex = {
-  name: "alex",
-  age: 23,
-  sex: "male" as const,
-};
-const nik = {
-  name: "nik",
-  age: 34,
-  sex: "male" as const,
-};
-const olivia = {
-  name: "olivia",
-  age: 20,
-  sex: "female" as const,
+
+const create_dto = ({ name, age, sex }: Partial<User>) => ({ name, age, sex });
+const with_friends = ({ id }: Partial<User>, friends: User[]) => ({
+  id,
+  friends,
+});
+const detailed = ({ id, name, age, sex }: Partial<User>) => {
+  const [first_name, last_name] = name!.split(" ");
+  return {
+    id,
+    first_name,
+    last_name,
+    age,
+    is_adult: age! >= 18,
+    sex,
+  };
 };
 const fixture = make_fixture
   .start_builder_chain
   .for_data_type<User>()
   .with_possible_tags<UserFixtureTag>()
   .data_can_be_transformed_into_such_views({
-    create_dto: ({ name, age, sex }) => ({ name, age, sex }),
-    with_friends: ({ id }, friends: User[]) => ({ id, friends }),
-    detailed: ({ id, name, age, sex }) => {
-      const [first_name, last_name] = name.split(" ");
-      return {
-        id,
-        first_name,
-        last_name,
-        age,
-        is_adult: age >= 18,
-        sex,
-      };
-    },
+    create_dto,
+    with_friends,
+    detailed,
   })
   .build({
-    nik: { fixture: nik, tags: ["men", "oboe", "programmers", "rust", "js"] },
-    alex: { fixture: alex, tags: ["men", "drums", "programmers", "go", "js"] },
-    olivia: { fixture: olivia, tags: ["women", "oboe"] },
+    nik: {
+      fixture: {
+        name: "nik",
+        age: 34,
+        sex: "male" as const,
+      },
+      tags: ["men", "drums", "programmers", "go", "js"],
+    },
+    alex: {
+      fixture: {
+        name: "alex",
+        age: 23,
+        sex: "male" as const,
+      },
+      tags: ["men", "oboe", "programmers", "rust", "js"],
+    },
+    olivia: {
+      fixture: {
+        name: "olivia",
+        age: 20,
+        sex: "female" as const,
+      },
+      tags: ["women", "oboe"],
+    },
   });
-
-fixture.many_with_tag.rust.foreach_update_data_source((d) => ({
-  ...d,
-  name: `${d.sex === "male" ? "Mr." : "Ms."} ${d.name}`,
-}));
-fixture.one_by_name.nik.add_to_more_tags("oboe");
-
-type FirstRest<T> = T extends [infer First, ...infer Rest] ? [First, Rest]
-  : never;
-type _T_help_message_for_data_type =
-  "ERROR: Explicit generic is missing! Should be something like: for_data_type<{...}>()";
-type _T_help_message_with_possible_tags =
-  "ERROR: Explicit generic is missing! Should be something like: with_possible_tags<['example', 'demo', 'tip']>()";
