@@ -1,10 +1,3 @@
-type FirstRest<T> = T extends [infer First, ...infer Rest] ? [First, Rest]
-  : never;
-type _T_help_message_for_data_type =
-  "ERROR: Explicit generic is missing! Should be something like: for_data_type<{...}>()";
-type _T_help_message_with_possible_tags =
-  "ERROR: Explicit generic is missing! Should be something like: with_possible_tags<['example', 'demo', 'tip']>()";
-
 export const make_fixture = {
   /**
    * A lot of properties are syntax sugar with purpose
@@ -24,7 +17,7 @@ export const make_fixture = {
      * The single data-set associated with user can be used
      * for user creation, user updates, view full or compact
      * user's representation, etc.
-     * ```typescript
+     * ```
      * make_fixture.for_data_type<{
      *   id: string;
      *   name: string;
@@ -47,7 +40,7 @@ export const make_fixture = {
         /**
          * Next generic only helper, that should extend
          * `string` type, for example:
-         * ```ts
+         * ```
          * .with_possible_tags<"all", "verified_only", "men">
          * ```
          * These tags will be used to mark fixtures and so have ability
@@ -82,7 +75,7 @@ export const make_fixture = {
              * The value of each property is a function - that should
              * transform initial data to some form.
              * Example:
-             * ```ts
+             * ```
              * {
              *    create_user_dto: (data) => ({ : data.email }),
              *    update_user_dto: (data) => ([data.id, ])
@@ -181,27 +174,37 @@ export const make_fixture = {
                     ) => void;
                   };
                 } => {
+                  let last_id = Date.now();
                   const db = Object
                     .entries(fixture_set)
                     .reduce(
                       (acc, [name, { fixture, tags }]) => {
+                        const id = ++last_id;
+                        acc.id_fixture.set(id, fixture);
                         acc.name_tag_fixture.set(
                           name,
-                          new Map(tags.map((t) => [t, fixture])),
+                          new Map(tags.map((t) => [t, id])),
                         );
-                        acc.name_fixture.set(name, fixture);
+                        acc.name_fixture.set(name, id);
                         for (const tag of tags) {
                           (acc.tag_name_fixture.get(tag) ||
                             acc.tag_name_fixture.set(tag, new Map()).get(tag)!)
-                            .set(name, fixture);
+                            .set(name, id);
                         }
 
                         return acc;
                       },
                       {
-                        name_fixture: new Map<string, TD>(),
-                        name_tag_fixture: new Map<string, Map<string, TD>>(),
-                        tag_name_fixture: new Map<string, Map<string, TD>>(),
+                        id_fixture: new Map<number, TD>(),
+                        name_fixture: new Map<string, number>(),
+                        name_tag_fixture: new Map<
+                          string,
+                          Map<string, number>
+                        >(),
+                        tag_name_fixture: new Map<
+                          string,
+                          Map<string, number>
+                        >(),
                       },
                     );
 
@@ -229,14 +232,22 @@ export const make_fixture = {
                           db.name_tag_fixture.get(name as string)!.delete(tag);
                           db.tag_name_fixture.get(tag)!.delete(name as string);
                         }),
-                      update_data_source: (logic) =>
-                        db.name_fixture.set(
-                          name as string,
-                          logic(db.name_fixture.get(name as string)!),
-                        ),
+                      update_data_source: (logic) => {
+                        const id = db.name_fixture.get(name as string)!;
+                        const fixture = db.id_fixture.get(id)!;
+                        const fresh = logic(
+                          fixture,
+                        );
+                        db.id_fixture.set(id, fresh);
+                      },
                       as: Object.entries(transformer).reduce((acc, [k, v]) => {
-                        acc[k as keyof T_transformer] = (...args) => () =>
-                          v(db.name_fixture.get(name as string)!, ...args);
+                        acc[k as keyof T_transformer] = (...args) => () => {
+                          const id = db.name_fixture.get(name as string)!;
+                          return v(
+                            db.id_fixture.get(id)!,
+                            ...args,
+                          );
+                        };
                         return acc;
                       }, {} as T_as),
                     }),
@@ -245,16 +256,22 @@ export const make_fixture = {
                         acc[k as keyof T_transformer] = () => (...args) => {
                           const views = (db.tag_name_fixture.get(tag) || [])
                             .values()
-                            .toArray().map((value) => fn(value, ...args));
+                            .toArray().map((id) =>
+                              fn(db.id_fixture.get(id)!, ...args)
+                            );
                           return views;
                         };
                         return acc;
                       }, {} as T_as_arr),
-                      foreach_update_data_source: (logic) =>
-                        db.tag_name_fixture.get(tag)!.entries().toArray()
-                          .forEach(([k, v]) =>
-                            db.tag_name_fixture.get(tag)!.set(k, logic(v))
-                          ),
+                      foreach_update_data_source: (logic) => {
+                        (db.tag_name_fixture.get(tag) ||
+                          new Map<string, number>()).entries()
+                          .toArray()
+                          .forEach(([_, v]) => {
+                            const fixture = db.id_fixture.get(v)!;
+                            db.id_fixture.set(v, logic(fixture));
+                          });
+                      },
                     }),
                   };
                 },
@@ -267,70 +284,9 @@ export const make_fixture = {
   },
 };
 
-type User = {
-  id: string;
-  name: string;
-  age: number;
-  sex: "male" | "female";
-};
-type UserFixtureTag =
-  | "programmers"
-  | "men"
-  | "women"
-  | "go"
-  | "rust"
-  | "js"
-  | "oboe"
-  | "drums";
-
-const create_dto = ({ name, age, sex }: Partial<User>) => ({ name, age, sex });
-const with_friends = ({ id }: Partial<User>, friends: User[]) => ({
-  id,
-  friends,
-});
-const detailed = ({ id, name, age, sex }: Partial<User>) => {
-  const [first_name, last_name] = name!.split(" ");
-  return {
-    id,
-    first_name,
-    last_name,
-    age,
-    is_adult: age! >= 18,
-    sex,
-  };
-};
-const fixture = make_fixture
-  .start_builder_chain
-  .for_data_type<User>()
-  .with_possible_tags<UserFixtureTag>()
-  .data_can_be_transformed_into_such_views({
-    create_dto,
-    with_friends,
-    detailed,
-  })
-  .build({
-    nik: {
-      fixture: {
-        name: "nik",
-        age: 34,
-        sex: "male" as const,
-      },
-      tags: ["men", "drums", "programmers", "go", "js"],
-    },
-    alex: {
-      fixture: {
-        name: "alex",
-        age: 23,
-        sex: "male" as const,
-      },
-      tags: ["men", "oboe", "programmers", "rust", "js"],
-    },
-    olivia: {
-      fixture: {
-        name: "olivia",
-        age: 20,
-        sex: "female" as const,
-      },
-      tags: ["women", "oboe"],
-    },
-  });
+type FirstRest<T> = T extends [infer First, ...infer Rest] ? [First, Rest]
+  : never;
+type _T_help_message_for_data_type =
+  "ERROR: Explicit generic is missing! Should be something like: for_data_type<{...}>()";
+type _T_help_message_with_possible_tags =
+  "ERROR: Explicit generic is missing! Should be something like: with_possible_tags<['example', 'demo', 'tip']>()";
