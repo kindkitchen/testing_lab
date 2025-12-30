@@ -1,3 +1,5 @@
+import { fn } from "@std/expect/fn";
+
 type FirstRest<T> = T extends [infer First, ...infer Rest] ? [First, Rest]
   : never;
 type _T_help_message_for_data_type =
@@ -181,27 +183,37 @@ export const make_fixture = {
                     ) => void;
                   };
                 } => {
+                  let last_id = Date.now();
                   const db = Object
                     .entries(fixture_set)
                     .reduce(
                       (acc, [name, { fixture, tags }]) => {
+                        const id = ++last_id;
+                        acc.id_fixture.set(id, fixture);
                         acc.name_tag_fixture.set(
                           name,
-                          new Map(tags.map((t) => [t, fixture])),
+                          new Map(tags.map((t) => [t, id])),
                         );
-                        acc.name_fixture.set(name, fixture);
+                        acc.name_fixture.set(name, id);
                         for (const tag of tags) {
                           (acc.tag_name_fixture.get(tag) ||
                             acc.tag_name_fixture.set(tag, new Map()).get(tag)!)
-                            .set(name, fixture);
+                            .set(name, id);
                         }
 
                         return acc;
                       },
                       {
-                        name_fixture: new Map<string, TD>(),
-                        name_tag_fixture: new Map<string, Map<string, TD>>(),
-                        tag_name_fixture: new Map<string, Map<string, TD>>(),
+                        id_fixture: new Map<number, TD>(),
+                        name_fixture: new Map<string, number>(),
+                        name_tag_fixture: new Map<
+                          string,
+                          Map<string, number>
+                        >(),
+                        tag_name_fixture: new Map<
+                          string,
+                          Map<string, number>
+                        >(),
                       },
                     );
 
@@ -229,14 +241,22 @@ export const make_fixture = {
                           db.name_tag_fixture.get(name as string)!.delete(tag);
                           db.tag_name_fixture.get(tag)!.delete(name as string);
                         }),
-                      update_data_source: (logic) =>
-                        db.name_fixture.set(
-                          name as string,
-                          logic(db.name_fixture.get(name as string)!),
-                        ),
+                      update_data_source: (logic) => {
+                        const id = db.name_fixture.get(name as string)!;
+                        const fixture = db.id_fixture.get(id)!;
+                        const fresh = logic(
+                          fixture,
+                        );
+                        db.id_fixture.set(id, fresh);
+                      },
                       as: Object.entries(transformer).reduce((acc, [k, v]) => {
-                        acc[k as keyof T_transformer] = (...args) => () =>
-                          v(db.name_fixture.get(name as string)!, ...args);
+                        acc[k as keyof T_transformer] = (...args) => () => {
+                          const id = db.name_fixture.get(name as string)!;
+                          return v(
+                            db.id_fixture.get(id)!,
+                            ...args,
+                          );
+                        };
                         return acc;
                       }, {} as T_as),
                     }),
@@ -245,16 +265,22 @@ export const make_fixture = {
                         acc[k as keyof T_transformer] = () => (...args) => {
                           const views = (db.tag_name_fixture.get(tag) || [])
                             .values()
-                            .toArray().map((value) => fn(value, ...args));
+                            .toArray().map((id) =>
+                              fn(db.id_fixture.get(id)!, ...args)
+                            );
                           return views;
                         };
                         return acc;
                       }, {} as T_as_arr),
-                      foreach_update_data_source: (logic) =>
-                        db.tag_name_fixture.get(tag)!.entries().toArray()
-                          .forEach(([k, v]) =>
-                            db.tag_name_fixture.get(tag)!.set(k, logic(v))
-                          ),
+                      foreach_update_data_source: (logic) => {
+                        (db.tag_name_fixture.get(tag) ||
+                          new Map<string, number>()).entries()
+                          .toArray()
+                          .forEach(([_, v]) => {
+                            const fixture = db.id_fixture.get(v)!;
+                            db.id_fixture.set(v, logic(fixture));
+                          });
+                      },
                     }),
                   };
                 },
