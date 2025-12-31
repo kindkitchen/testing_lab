@@ -5,9 +5,10 @@
     "@std/expect": "jsr:@std/expect@^1.0.17"
   },
   "name": "@kindkitchen/testkit",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "exports": {
-    "./make_fixture": "./make_fixture.ts"
+    "./make_fixture": "./make_fixture.js",
+    "./make_fixture_ts": "./make_fixture.ts"
   },
   "license": "MIT"
 }
