@@ -1,6 +1,6 @@
 {
   "name": "@kindkitchen/testkit",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "exports": {
     "./make_fixture": "./transpiled/make_fixture.js",
     "./make_fixture_ts": "./src/make_fixture.ts"
@@ -9,7 +9,9 @@
   "exactOptionalPropertyTypes": true,
   "imports": {
     "@std/expect": "jsr:@std/expect@^1.0.17",
-    "typescript": "npm:typescript@^5.9.3"
+    "@std/fs": "jsr:@std/fs@^1.0.21",
+    "@std/path": "jsr:@std/path@^1.1.4",
+    "tsup": "npm:tsup@^8.5.1"
   },
   "fmt": {
     "exclude": ["dist", "transpiled"]
@@ -22,7 +24,7 @@
     },
     "transpile": {
       "description": "ts to js",
-      "command": "deno x tsc -p .config/tsconfig.json",
+      "command": "deno x tsup --config .config/tsup.config.ts",
       "dependencies": [
         "clean"
       ]
