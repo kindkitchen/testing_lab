@@ -1,0 +1,15 @@
+{
+  "include": [
+    "../src/make_fixture.ts"
+  ],
+  "compilerOptions": {
+    "outDir": "../transpiled",
+    "lib": [
+      "ESNext"
+    ],
+    "sourceMap": true
+    // "declaration": true,
+    // "declarationMap": true,
+    // "esModuleInterop": true
+  }
+}
