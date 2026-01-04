@@ -115,5 +115,22 @@ Deno.test("make_fixture (v3)", async (t) => {
         );
       },
     );
+    await t.step(
+      "by tag mapped to list should behave as array of independent fixtures",
+      async (t) => {
+        for (const f of fixture.many_with_tag("men").to_array_of_fixtures()) {
+          await t.step(
+            "data to view transformation function should not affect data-source",
+            () => {
+              const alex = f.as.it_is();
+              const alex_with_uuid = f.as
+                .with_fake_uuid(crypto.randomUUID());
+              expect(alex_with_uuid()).toHaveProperty("uuid");
+              expect(alex()).not.toHaveProperty("uuid");
+            },
+          );
+        }
+      },
+    );
   });
 });

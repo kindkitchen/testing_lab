@@ -108,6 +108,39 @@ declare const make_fixture: {
                          * Api for manage list of fixtures with some tag.
                          */
                         many_with_tag: (tag: Exclude<T_tags, "" | "ERROR: Explicit generic is missing! Should be something like: with_possible_tags<['example', 'demo', 'tip']>()">) => {
+                            to_array_of_fixtures: () => {
+                                /**
+                                 * Generate representation of data, that you declared during build.
+                                 * You will get not directly this representation, function: `() => representation`.
+                                 * So until logic of the representation is the same it will automatically produce
+                                 * it with actual values from data-source.
+                                 */
+                                as: { [k in keyof T_transformer]: (...params: FirstRest<Parameters<T_transformer[k]>>[1]) => () => ReturnType<T_transformer[k]>; };
+                                /**
+                                 * Mark this fixture with some tags.
+                                 * No matter does it is already marked by them or not, but
+                                 * from now it will.
+                                 */
+                                add_to_more_tags: (...tag: Exclude<T_tags, "" | "ERROR: Explicit generic is missing! Should be something like: with_possible_tags<['example', 'demo', 'tip']>()">[]) => void;
+                                /**
+                                 * Remove from fixture associations with ome tags.
+                                 * No matter does it is already marked by them or not, but
+                                 * from not it will not.
+                                 */
+                                remove_from_tags: (...tag: Exclude<T_tags, "" | "ERROR: Explicit generic is missing! Should be something like: with_possible_tags<['example', 'demo', 'tip']>()">[]) => void;
+                                /**
+                                 * The only one correct way to update fixture's data.
+                                 */
+                                update_data_source: (
+                                /**
+                                 * Your custom logic how to produce new data from previous varian.
+                                 * Because it is function - you can do this with any custom logic
+                                 * or even skip update because of some condition, though in such case you should
+                                 * return input as it is...
+                                 * So the rule is simple - data will be updated to whatever your function return.
+                                 */
+                                update_logic: (d: Partial<Exclude<T_data, "ERROR: Explicit generic is missing! Should be something like: for_data_type<{...}>()">>) => Partial<Exclude<T_data, "ERROR: Explicit generic is missing! Should be something like: for_data_type<{...}>()">>) => void;
+                            }[];
                             /**
                              * Generate array with representations for all fixtures marked by some tag.
                              * It is also will return not directly array with these views but function,
